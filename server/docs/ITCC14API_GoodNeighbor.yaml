@@ -138,20 +138,8 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
       parameters:
-      - name: page
-        in: query
-        required: false
-        description: Page number (default 1)
-        schema:
-          type: integer
-          example: 1
-      - name: limit
-        in: query
-        required: false
-        description: Items per page (default 20)
-        schema:
-          type: integer
-          example: 20
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
       - name: role
         in: query
         required: false
@@ -210,6 +198,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -220,10 +210,11 @@ paths:
       - name: id
         in: path
         required: true
-        description: User ID
+        description: User ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
     patch:
       tags:
       - Users
@@ -252,10 +243,11 @@ paths:
       - name: id
         in: path
         required: true
-        description: User ID
+        description: User ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
       requestBody:
         required: true
         content:
@@ -270,7 +262,8 @@ paths:
       - Organizer Applications
       operationId: createOrganizerApplication
       summary: Apply to become an organizer
-      description: 'A user can only have one **pending** application at a time (409 otherwise).
+      description: 'A user can only have one **pending** application at a time (409 otherwise). After a rejection they may
+        apply again.
 
 
         **Who can use this:** Volunteer'
@@ -307,7 +300,11 @@ paths:
       - Organizer Applications
       operationId: listOrganizerApplications
       summary: List organizer applications
-      description: '**Who can use this:** Admin'
+      description: 'Admins see **all** applications. Everyone else sees **only their own** (newest first), so applicants can
+        check their status without knowing the application ID.
+
+
+        **Who can use this:** Any logged-in user (non-admins only see their own)'
       responses:
         '200':
           description: Applications
@@ -319,23 +316,9 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
       parameters:
-      - name: page
-        in: query
-        required: false
-        description: Page number (default 1)
-        schema:
-          type: integer
-          example: 1
-      - name: limit
-        in: query
-        required: false
-        description: Items per page (default 20)
-        schema:
-          type: integer
-          example: 20
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
       - name: status
         in: query
         required: false
@@ -361,6 +344,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrganizerApplication'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -371,17 +356,25 @@ paths:
       - name: id
         in: path
         required: true
-        description: Application ID
+        description: Application ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
     patch:
       tags:
       - Organizer Applications
       operationId: reviewOrganizerApplication
       summary: Approve or reject an application
-      description: 'On **approve**, the user''s role becomes `organizer` and an organization profile is created from the application.
-        On **reject**, a review_note is required.
+      description: 'Only **pending** applications can be reviewed. Reviewing an already approved or rejected application returns
+        409, so approving twice can never create a second organization.
+
+
+        On **approve** (one database transaction): the user''s role becomes `organizer` and one organization is created from
+        the application. Each organizer can only have one organization (also enforced by the database), so this returns 409
+        if the user already has one.
+
+        On **reject**, a review_note is required (400 without it).
 
 
         **Who can use this:** Admin'
@@ -400,14 +393,23 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Application was already reviewed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Application has already been reviewed
       parameters:
       - name: id
         in: path
         required: true
-        description: Application ID
+        description: Application ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
       requestBody:
         required: true
         content:
@@ -438,20 +440,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
       security: []
       parameters:
-      - name: page
-        in: query
-        required: false
-        description: Page number (default 1)
-        schema:
-          type: integer
-          example: 1
-      - name: limit
-        in: query
-        required: false
-        description: Items per page (default 20)
-        schema:
-          type: integer
-          example: 20
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
       - name: q
         in: query
         required: false
@@ -485,6 +475,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Organization'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
       security: []
@@ -492,10 +484,11 @@ paths:
       - name: id
         in: path
         required: true
-        description: Organization ID
+        description: Organization ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
     put:
       tags:
       - Organizations
@@ -521,10 +514,11 @@ paths:
       - name: id
         in: path
         required: true
-        description: Organization ID
+        description: Organization ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
       requestBody:
         required: true
         content:
@@ -541,7 +535,15 @@ paths:
       - Organizations
       operationId: deleteOrganization
       summary: Remove an organization
-      description: 'Also unpublishes its upcoming events.
+      description: 'Soft delete (sets `deleted_at`). What happens:
+
+        - The organization disappears from listings, and `GET /api/organizations/{id}` returns 404.
+
+        - Its `upcoming` events are set to `cancelled`.
+
+        - All registrations and attendance records are kept as history (nothing is deleted).
+
+        - Its organizer can no longer create or edit events (403).
 
 
         **Who can use this:** Admin'
@@ -554,6 +556,8 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
               example:
                 message: Organization removed
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -564,10 +568,11 @@ paths:
       - name: id
         in: path
         required: true
-        description: Organization ID
+        description: Organization ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
   /api/organizations/{id}/events:
     get:
       tags:
@@ -591,24 +596,13 @@ paths:
       - name: id
         in: path
         required: true
-        description: Organization ID
+        description: Organization ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
-      - name: page
-        in: query
-        required: false
-        description: Page number (default 1)
-        schema:
-          type: integer
-          example: 1
-      - name: limit
-        in: query
-        required: false
-        description: Items per page (default 20)
-        schema:
-          type: integer
-          example: 20
+          minimum: 1
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
   /api/events:
     get:
       tags:
@@ -627,20 +621,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
       security: []
       parameters:
-      - name: page
-        in: query
-        required: false
-        description: Page number (default 1)
-        schema:
-          type: integer
-          example: 1
-      - name: limit
-        in: query
-        required: false
-        description: Items per page (default 20)
-        schema:
-          type: integer
-          example: 20
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
       - name: q
         in: query
         required: false
@@ -668,13 +650,15 @@ paths:
         schema:
           type: string
           example: '2026-11-01'
+          format: date
       - name: to_date
         in: query
         required: false
-        description: Events starting on or before this date (YYYY-MM-DD)
+        description: Events starting on or before this date (YYYY-MM-DD). Must be on or after from_date (400 otherwise).
         schema:
           type: string
           example: '2026-12-31'
+          format: date
       - name: status
         in: query
         required: false
@@ -690,7 +674,8 @@ paths:
       - Events
       operationId: createEvent
       summary: Create an event
-      description: 'The event is attached to the organizer''s own organization automatically.
+      description: 'The event is attached to the organizer''s own organization automatically. New events always start as `upcoming`.
+        See EventInput for validation rules.
 
 
         **Who can use this:** Organizer'
@@ -757,6 +742,8 @@ paths:
                 safety_notes: Wear closed shoes.
                 status: upcoming
                 created_at: '2026-11-03T08:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '404':
           $ref: '#/components/responses/NotFound'
       security: []
@@ -764,16 +751,28 @@ paths:
       - name: id
         in: path
         required: true
-        description: Event ID
+        description: Event ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
     put:
       tags:
       - Events
       operationId: updateEvent
       summary: Edit an event
-      description: 'Slots can''t be set lower than the number of people already registered (400).
+      description: 'Rules:
+
+        - Only `upcoming` events can be edited. Cancelled and completed events are final (409).
+
+        - Slots can''t be set lower than the number of `registered` + `attended` registrations (400).
+
+        - Setting `status: cancelled` keeps all registrations as history; the event just closes. Volunteers see it as cancelled
+        in their registrations.
+
+        - `status: completed` is only allowed once the event has started (400).
+
+        - Date and coordinate rules are the same as creating (see EventInput).
 
 
         **Who can use this:** Organizer (owner)'
@@ -792,14 +791,23 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Event is already cancelled or completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Cancelled or completed events can't be edited
       parameters:
       - name: id
         in: path
         required: true
-        description: Event ID
+        description: Event ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
       requestBody:
         required: true
         content:
@@ -811,7 +819,11 @@ paths:
       - Events
       operationId: deleteEvent
       summary: Delete an event
-      description: '**Who can use this:** Organizer (owner), Admin'
+      description: 'Only allowed if the event has **no registrations at all** (including cancelled ones), so registration
+        and attendance history is never lost. Otherwise returns 409; cancel the event instead (`PUT` with `status: cancelled`).
+
+
+        **Who can use this:** Organizer (owner), Admin'
       responses:
         '200':
           description: Success
@@ -821,27 +833,52 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
               example:
                 message: Event deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Event has registrations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Event has registrations. Cancel it instead.
       parameters:
       - name: id
         in: path
         required: true
-        description: Event ID
+        description: Event ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
   /api/events/{id}/registrations:
     post:
       tags:
       - Registrations
       operationId: registerForEvent
       summary: Register for an event
-      description: '**Who can use this:** Volunteer'
+      description: 'Rules:
+
+        - The event must be `upcoming` and not started yet. Cancelled, completed or started events return 409.
+
+        - Only one active registration per event. If you already have one that is not `cancelled`, returns 409.
+
+        - Registering again after cancelling is allowed: it creates a **new** registration (the old cancelled one stays as
+        history).
+
+        - The event must have a free slot (`registered` + `attended` < `slots`), otherwise 409.
+
+        - Organizers and admins can''t register (403).
+
+
+        **Who can use this:** Volunteer'
       responses:
         '201':
           description: Registered
@@ -853,24 +890,35 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: Already registered, or the event is full
+          description: Event is not open, already registered, or the event is full
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-              example:
-                error: Event is full
+              examples:
+                full:
+                  value:
+                    error: Event is full
+                closed:
+                  value:
+                    error: Event is not open for registration
+                duplicate:
+                  value:
+                    error: You are already registered for this event
       parameters:
       - name: id
         in: path
         required: true
-        description: Event ID
+        description: Event ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
       requestBody:
         required: true
         content:
@@ -904,24 +952,13 @@ paths:
       - name: id
         in: path
         required: true
-        description: Event ID
+        description: Event ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
-      - name: page
-        in: query
-        required: false
-        description: Page number (default 1)
-        schema:
-          type: integer
-          example: 1
-      - name: limit
-        in: query
-        required: false
-        description: Items per page (default 20)
-        schema:
-          type: integer
-          example: 20
+          minimum: 1
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
       - name: status
         in: query
         required: false
@@ -952,20 +989,8 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
       parameters:
-      - name: page
-        in: query
-        required: false
-        description: Page number (default 1)
-        schema:
-          type: integer
-          example: 1
-      - name: limit
-        in: query
-        required: false
-        description: Items per page (default 20)
-        schema:
-          type: integer
-          example: 20
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Limit'
       - name: status
         in: query
         required: false
@@ -983,7 +1008,20 @@ paths:
       - Registrations
       operationId: markAttendance
       summary: Mark attendance
-      description: '**Who can use this:** Organizer (owner of the event)'
+      description: 'Rules:
+
+        - Only after the event has **started** (409 before that).
+
+        - Not allowed if the event is `cancelled` (409). Allowed on `upcoming` and `completed` events, so organizers can finish
+        attendance after the event.
+
+        - Can update registrations that are `registered`, `attended` or `absent` (so mistakes can be fixed). `cancelled` registrations
+        can''t be changed (409).
+
+        - New status must be `attended` or `absent`.
+
+
+        **Who can use this:** Organizer (owner of the event)'
       responses:
         '200':
           description: Attendance updated
@@ -999,14 +1037,23 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Attendance can't be marked right now
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Attendance can be marked once the event starts
       parameters:
       - name: id
         in: path
         required: true
-        description: Registration ID
+        description: Registration ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
       requestBody:
         required: true
         content:
@@ -1023,6 +1070,10 @@ paths:
       description: 'Sets the status to `cancelled` (keeps history) and frees up the slot.
 
 
+        Only allowed when the status is `registered` **and** the event hasn''t started yet. Returns 409 if attendance was
+        already recorded (`attended` / `absent`), if it''s already cancelled, or if the event has started.
+
+
         **Who can use this:** Volunteer (owner)'
       responses:
         '200':
@@ -1033,20 +1084,31 @@ paths:
                 $ref: '#/components/schemas/MessageResponse'
               example:
                 message: Registration cancelled
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: Can't cancel this registration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Attendance was already recorded
       parameters:
       - name: id
         in: path
         required: true
-        description: Registration ID
+        description: Registration ID (positive whole number, otherwise 400)
         schema:
           type: integer
           example: 1
+          minimum: 1
   /api/geocode:
     get:
       tags:
@@ -1386,10 +1448,12 @@ components:
           type: string
           format: date-time
           example: '2026-11-21T06:00:00+08:00'
+          description: Must be in the future
         ends_at:
           type: string
           format: date-time
           example: '2026-11-21T10:00:00+08:00'
+          description: Must be after starts_at
         slots:
           type: integer
           minimum: 1
@@ -1400,9 +1464,13 @@ components:
         lat:
           type: number
           example: 8.4965
+          minimum: -90
+          maximum: 90
         lng:
           type: number
           example: 124.6477
+          minimum: -180
+          maximum: 180
         safety_notes:
           type: string
           example: Wear closed shoes.
@@ -1413,14 +1481,25 @@ components:
           - cancelled
           - completed
           example: upcoming
+          description: Edit only. `upcoming` → `cancelled` any time. `upcoming` → `completed` only after the event has started.
       required:
       - title
       - category
       - starts_at
+      - ends_at
       - slots
       - address
       - lat
       - lng
+      description: 'Validation rules (400 if broken):
+
+        - `starts_at` must be in the future when creating, or when changing it on edit.
+
+        - `ends_at` is required and must be after `starts_at`.
+
+        - `lat` must be between -90 and 90, `lng` between -180 and 180.
+
+        - `slots` must be 1 or more.'
     Event:
       type: object
       properties:
@@ -1474,9 +1553,13 @@ components:
         lat:
           type: number
           example: 8.4965
+          minimum: -90
+          maximum: 90
         lng:
           type: number
           example: 124.6477
+          minimum: -180
+          maximum: 180
         safety_notes:
           type: string
         status:
@@ -1509,6 +1592,18 @@ components:
         event_title:
           type: string
           example: Macabalan Coastal Cleanup
+        event_starts_at:
+          type: string
+          format: date-time
+          example: '2026-11-21T06:00:00+08:00'
+        event_status:
+          type: string
+          enum:
+          - upcoming
+          - cancelled
+          - completed
+          example: upcoming
+          description: Lets volunteers see if an event they joined was cancelled
         user_id:
           type: integer
           example: 1
@@ -1639,5 +1734,27 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             error: Email is already registered
+  parameters:
+    Page:
+      name: page
+      in: query
+      required: false
+      description: Page number. Whole number, 1 or higher (default 1). Anything else returns 400.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+        example: 1
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Items per page. Whole number from 1 to 50 (default 20). Anything else returns 400.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 20
+        example: 20
 security:
 - bearerAuth: []

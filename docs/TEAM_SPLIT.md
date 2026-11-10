@@ -200,6 +200,11 @@ server/src/
 - One organization per organizer.
 - Slots: `registered` + `attended` count toward slots. Slots can't be edited below that count.
 - Cancelling a registration sets `status = cancelled` (history is kept). Re-registering creates a new row.
+- **Registrations are never deleted.** Cancelling an event or removing an organization keeps all registration and attendance history.
+- Register only for `upcoming` events that haven't started. Cancel only while the status is `registered` and the event hasn't started.
+- Mark attendance (`attended` / `absent`) only after the event starts, never on cancelled events or cancelled registrations.
+- Only `pending` applications can be reviewed (409 otherwise), so there are no duplicate organizations.
+- Validation: `page` ≥ 1, `limit` 1–50, `lat` −90..90, `lng` −180..180, `ends_at` required and after `starts_at`, `starts_at` in the future.
 
 ---
 
