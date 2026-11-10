@@ -1,122 +1,50 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import { Navigate, Route, Routes } from 'react-router-dom'
+import ProtectedRoute from './components/ProtectedRoute'
+import Placeholder from './components/Placeholder'
 
-function App() {
-  const [count, setCount] = useState(0)
+// Each person adds or replaces routes ONLY inside their own section.
+// Swap <Placeholder ... /> for your real page when it's ready.
 
+export default function App() {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <Routes>
+      {/* --- TAMPUS: public pages --- */}
+      <Route path="/" element={<Placeholder name="Landing" owner="TAMPUS" />} />
+      <Route path="/explore" element={<Placeholder name="Explore" owner="TAMPUS" />} />
+      <Route path="/activities/:id" element={<Placeholder name="Activity Details" owner="TAMPUS" />} />
+      <Route path="/organizations/:id" element={<Placeholder name="Organization" owner="TAMPUS" />} />
 
-      <div className="ticks"></div>
+      {/* --- TAN: auth --- */}
+      <Route path="/login" element={<Placeholder name="Log in" owner="TAN" />} />
+      <Route path="/signup" element={<Placeholder name="Sign up" owner="TAN" />} />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* Logged-in users only */}
+      <Route element={<ProtectedRoute />}>
+        {/* --- TAN --- */}
+        <Route path="/apply" element={<Placeholder name="Apply as organizer" owner="TAN" />} />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+        {/* --- LIM: volunteer --- */}
+        <Route path="/my-activities" element={<Placeholder name="My Activities" owner="LIM" />} />
+        <Route path="/impact" element={<Placeholder name="Impact" owner="LIM" />} />
+        <Route path="/profile" element={<Placeholder name="Profile" owner="LIM" />} />
+      </Route>
+
+      {/* --- BARNEDO: organizer only --- */}
+      <Route element={<ProtectedRoute roles={['organizer']} />}>
+        <Route path="/organizer" element={<Placeholder name="Organizer Overview" owner="BARNEDO" />} />
+        <Route path="/organizer/activities/new" element={<Placeholder name="Create Activity" owner="BARNEDO" />} />
+        <Route path="/organizer/activities/:id/edit" element={<Placeholder name="Edit Activity" owner="BARNEDO" />} />
+        <Route path="/organizer/activities/:id" element={<Placeholder name="Manage Activity" owner="BARNEDO" />} />
+      </Route>
+
+      {/* --- TAN: admin only --- */}
+      <Route element={<ProtectedRoute roles={['admin']} />}>
+        <Route path="/admin" element={<Placeholder name="Admin Overview" owner="TAN" />} />
+        <Route path="/admin/manage" element={<Placeholder name="Admin Manage" owner="TAN + BARNEDO" />} />
+      </Route>
+
+      {/* Unknown URL -> home */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
-
-export default App
