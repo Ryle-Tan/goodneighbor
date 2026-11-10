@@ -1,0 +1,1643 @@
+openapi: 3.0.3
+info:
+  title: GoodNeighbor API
+  version: 1.0.0
+  description: 'API for GoodNeighbor, a community volunteering platform for Cagayan de Oro.
+
+
+    - **Volunteers** browse events and register.
+
+    - **Organizers** (verified NGOs, barangays, LGUs) post events and track attendance.
+
+    - **Admins** verify organizers and manage accounts.
+
+
+    Stack: React + Node.js/Express + PostgreSQL. Auth uses JWT bearer tokens.'
+servers:
+- url: http://localhost:3000
+  description: Local development
+tags:
+- name: Auth
+  description: 'Sign up and log in. Module lead: TAN'
+- name: Users
+  description: 'User profiles and account management. Module lead: TAN'
+- name: Organizer Applications
+  description: 'Applying to become a verified organizer, reviewed by admins. Module lead: TAN'
+- name: Organizations
+  description: 'View-only profiles of verified organizations. Module lead: BARNEDO'
+- name: Events
+  description: 'Volunteer activities posted by organizers. Module lead: BARNEDO'
+- name: Registrations
+  description: 'Joining events and tracking attendance. Module lead: LIM'
+- name: Geocode
+  description: 'Address to map coordinates for meetup points. Module lead: TAMPUS'
+paths:
+  /api/auth/register:
+    post:
+      tags:
+      - Auth
+      operationId: registerUser
+      summary: Create an account
+      description: 'Every new account starts as a **volunteer**. To post events, the user must apply to become an organizer.
+
+
+        **Who can use this:** Anyone (not logged in)'
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              name: Juan Dela Cruz
+              email: juan@my.xu.edu.ph
+              password: secret123
+  /api/auth/login:
+    post:
+      tags:
+      - Auth
+      operationId: loginUser
+      summary: Log in
+      description: '**Who can use this:** Anyone (not logged in)'
+      responses:
+        '200':
+          description: Logged in. Use the token in the Authorization header.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                token: eyJhbGciOiJIUzI1NiIs...
+                user:
+                  id: 1
+                  name: Juan Dela Cruz
+                  email: juan@my.xu.edu.ph
+                  role: volunteer
+                  is_active: true
+                  created_at: '2026-11-03T08:00:00Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: juan@my.xu.edu.ph
+              password: secret123
+  /api/auth/me:
+    get:
+      tags:
+      - Auth
+      operationId: getCurrentUser
+      summary: Get the logged-in user
+      description: '**Who can use this:** Any logged-in user'
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /api/users:
+    get:
+      tags:
+      - Users
+      operationId: listUsers
+      summary: List all users
+      description: '**Who can use this:** Admin'
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      parameters:
+      - name: page
+        in: query
+        required: false
+        description: Page number (default 1)
+        schema:
+          type: integer
+          example: 1
+      - name: limit
+        in: query
+        required: false
+        description: Items per page (default 20)
+        schema:
+          type: integer
+          example: 20
+      - name: role
+        in: query
+        required: false
+        description: Filter by role
+        schema:
+          type: string
+          enum:
+          - volunteer
+          - organizer
+          - admin
+      - name: q
+        in: query
+        required: false
+        description: Search by name or email
+        schema:
+          type: string
+          example: juan
+  /api/users/me:
+    put:
+      tags:
+      - Users
+      operationId: updateMyProfile
+      summary: Update my profile
+      description: '**Who can use this:** Any logged-in user'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+            example:
+              name: Juan D. Cruz
+              phone: 09171234567
+  /api/users/{id}:
+    get:
+      tags:
+      - Users
+      operationId: getUser
+      summary: Get one user
+      description: '**Who can use this:** Admin'
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: User ID
+        schema:
+          type: integer
+          example: 1
+    patch:
+      tags:
+      - Users
+      operationId: updateUserStatus
+      summary: Activate or deactivate a user
+      description: 'Deactivated users can no longer log in. Used for fake or abusive accounts.
+
+
+        **Who can use this:** Admin'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: User ID
+        schema:
+          type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserStatusUpdate'
+            example:
+              is_active: false
+  /api/organizer-applications:
+    post:
+      tags:
+      - Organizer Applications
+      operationId: createOrganizerApplication
+      summary: Apply to become an organizer
+      description: 'A user can only have one **pending** application at a time (409 otherwise).
+
+
+        **Who can use this:** Volunteer'
+      responses:
+        '201':
+          description: Application submitted with status 'pending'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizerApplication'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizerApplicationCreate'
+            example:
+              org_name: CDO Coastal Cleanup Network
+              org_type: ngo
+              description: We organize monthly coastal cleanups in Macabalan and Bonbon.
+              contact_email: hello@cdocleanup.org
+              contact_phone: 09171234567
+              proof_url: https://drive.google.com/file/d/example
+    get:
+      tags:
+      - Organizer Applications
+      operationId: listOrganizerApplications
+      summary: List organizer applications
+      description: '**Who can use this:** Admin'
+      responses:
+        '200':
+          description: Applications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizerApplicationList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      parameters:
+      - name: page
+        in: query
+        required: false
+        description: Page number (default 1)
+        schema:
+          type: integer
+          example: 1
+      - name: limit
+        in: query
+        required: false
+        description: Items per page (default 20)
+        schema:
+          type: integer
+          example: 20
+      - name: status
+        in: query
+        required: false
+        description: Filter by status
+        schema:
+          type: string
+          enum:
+          - pending
+          - approved
+          - rejected
+          example: pending
+  /api/organizer-applications/{id}:
+    get:
+      tags:
+      - Organizer Applications
+      operationId: getOrganizerApplication
+      summary: Get one application
+      description: '**Who can use this:** Admin, or the applicant'
+      responses:
+        '200':
+          description: Application
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizerApplication'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Application ID
+        schema:
+          type: integer
+          example: 1
+    patch:
+      tags:
+      - Organizer Applications
+      operationId: reviewOrganizerApplication
+      summary: Approve or reject an application
+      description: 'On **approve**, the user''s role becomes `organizer` and an organization profile is created from the application.
+        On **reject**, a review_note is required.
+
+
+        **Who can use this:** Admin'
+      responses:
+        '200':
+          description: Application reviewed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizerApplication'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Application ID
+        schema:
+          type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizerApplicationReview'
+            example:
+              status: approved
+              review_note: SEC registration verified.
+  /api/organizations:
+    get:
+      tags:
+      - Organizations
+      operationId: listOrganizations
+      summary: Browse verified organizations
+      description: 'Organizations are view-only profiles. Volunteers can''t join them; they join the organization''s **events**.
+
+
+        **Who can use this:** Anyone'
+      responses:
+        '200':
+          description: Organizations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      security: []
+      parameters:
+      - name: page
+        in: query
+        required: false
+        description: Page number (default 1)
+        schema:
+          type: integer
+          example: 1
+      - name: limit
+        in: query
+        required: false
+        description: Items per page (default 20)
+        schema:
+          type: integer
+          example: 20
+      - name: q
+        in: query
+        required: false
+        description: Search by name
+        schema:
+          type: string
+          example: cleanup
+      - name: org_type
+        in: query
+        required: false
+        description: Filter by type
+        schema:
+          type: string
+          enum:
+          - ngo
+          - lgu
+          - barangay
+          - school_org
+          - other
+  /api/organizations/{id}:
+    get:
+      tags:
+      - Organizations
+      operationId: getOrganization
+      summary: Get one organization's profile
+      description: '**Who can use this:** Anyone'
+      responses:
+        '200':
+          description: Organization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Organization ID
+        schema:
+          type: integer
+          example: 1
+    put:
+      tags:
+      - Organizations
+      operationId: updateOrganization
+      summary: Edit my organization's profile
+      description: '**Who can use this:** Organizer (owner)'
+      responses:
+        '200':
+          description: Organization updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Organization ID
+        schema:
+          type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationInput'
+            example:
+              name: CDO Coastal Cleanup Network
+              description: Monthly coastal cleanups around CDO.
+              contact_email: hello@cdocleanup.org
+              contact_phone: 09171234567
+    delete:
+      tags:
+      - Organizations
+      operationId: deleteOrganization
+      summary: Remove an organization
+      description: 'Also unpublishes its upcoming events.
+
+
+        **Who can use this:** Admin'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Organization removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Organization ID
+        schema:
+          type: integer
+          example: 1
+  /api/organizations/{id}/events:
+    get:
+      tags:
+      - Organizations
+      operationId: listOrganizationEvents
+      summary: List an organization's events
+      description: '**Who can use this:** Anyone'
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Organization ID
+        schema:
+          type: integer
+          example: 1
+      - name: page
+        in: query
+        required: false
+        description: Page number (default 1)
+        schema:
+          type: integer
+          example: 1
+      - name: limit
+        in: query
+        required: false
+        description: Items per page (default 20)
+        schema:
+          type: integer
+          example: 20
+  /api/events:
+    get:
+      tags:
+      - Events
+      operationId: listEvents
+      summary: Browse events
+      description: '**Who can use this:** Anyone'
+      responses:
+        '200':
+          description: Events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+      security: []
+      parameters:
+      - name: page
+        in: query
+        required: false
+        description: Page number (default 1)
+        schema:
+          type: integer
+          example: 1
+      - name: limit
+        in: query
+        required: false
+        description: Items per page (default 20)
+        schema:
+          type: integer
+          example: 20
+      - name: q
+        in: query
+        required: false
+        description: Search title or description
+        schema:
+          type: string
+          example: cleanup
+      - name: category
+        in: query
+        required: false
+        description: Filter by category
+        schema:
+          type: string
+          enum:
+          - cleanup
+          - tree_planting
+          - feeding_program
+          - relief_operations
+          - education
+          - other
+      - name: from_date
+        in: query
+        required: false
+        description: Events starting on or after this date (YYYY-MM-DD)
+        schema:
+          type: string
+          example: '2026-11-01'
+      - name: to_date
+        in: query
+        required: false
+        description: Events starting on or before this date (YYYY-MM-DD)
+        schema:
+          type: string
+          example: '2026-12-31'
+      - name: status
+        in: query
+        required: false
+        description: 'Default: upcoming'
+        schema:
+          type: string
+          enum:
+          - upcoming
+          - cancelled
+          - completed
+    post:
+      tags:
+      - Events
+      operationId: createEvent
+      summary: Create an event
+      description: 'The event is attached to the organizer''s own organization automatically.
+
+
+        **Who can use this:** Organizer'
+      responses:
+        '201':
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventInput'
+            example:
+              title: Macabalan Coastal Cleanup
+              description: Bring gloves and water. Sacks provided.
+              category: cleanup
+              starts_at: '2026-11-21T06:00:00+08:00'
+              ends_at: '2026-11-21T10:00:00+08:00'
+              slots: 40
+              address: Macabalan, Cagayan de Oro
+              lat: 8.4965
+              lng: 124.6477
+              safety_notes: Wear closed shoes. Stay away from the breakwater.
+  /api/events/{id}:
+    get:
+      tags:
+      - Events
+      operationId: getEvent
+      summary: Get one event
+      description: '**Who can use this:** Anyone'
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+              example:
+                id: 12
+                organization_id: 3
+                organization_name: CDO Coastal Cleanup Network
+                organization_verified: true
+                title: Macabalan Coastal Cleanup
+                description: Bring gloves and water. Sacks provided.
+                category: cleanup
+                starts_at: '2026-11-21T06:00:00+08:00'
+                ends_at: '2026-11-21T10:00:00+08:00'
+                slots: 40
+                registered_count: 25
+                available_slots: 15
+                address: Macabalan, Cagayan de Oro
+                lat: 8.4965
+                lng: 124.6477
+                safety_notes: Wear closed shoes.
+                status: upcoming
+                created_at: '2026-11-03T08:00:00Z'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      security: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Event ID
+        schema:
+          type: integer
+          example: 1
+    put:
+      tags:
+      - Events
+      operationId: updateEvent
+      summary: Edit an event
+      description: 'Slots can''t be set lower than the number of people already registered (400).
+
+
+        **Who can use this:** Organizer (owner)'
+      responses:
+        '200':
+          description: Event updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Event ID
+        schema:
+          type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventInput'
+    delete:
+      tags:
+      - Events
+      operationId: deleteEvent
+      summary: Delete an event
+      description: '**Who can use this:** Organizer (owner), Admin'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Event deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Event ID
+        schema:
+          type: integer
+          example: 1
+  /api/events/{id}/registrations:
+    post:
+      tags:
+      - Registrations
+      operationId: registerForEvent
+      summary: Register for an event
+      description: '**Who can use this:** Volunteer'
+      responses:
+        '201':
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Registration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Already registered, or the event is full
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Event is full
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Event ID
+        schema:
+          type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrationCreate'
+            example:
+              note: I'll bring extra gloves.
+    get:
+      tags:
+      - Registrations
+      operationId: listEventRegistrations
+      summary: List who registered for an event
+      description: '**Who can use this:** Organizer (owner), Admin'
+      responses:
+        '200':
+          description: Registrations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Event ID
+        schema:
+          type: integer
+          example: 1
+      - name: page
+        in: query
+        required: false
+        description: Page number (default 1)
+        schema:
+          type: integer
+          example: 1
+      - name: limit
+        in: query
+        required: false
+        description: Items per page (default 20)
+        schema:
+          type: integer
+          example: 20
+      - name: status
+        in: query
+        required: false
+        description: Filter by status
+        schema:
+          type: string
+          enum:
+          - registered
+          - attended
+          - absent
+          - cancelled
+  /api/users/me/registrations:
+    get:
+      tags:
+      - Registrations
+      operationId: listMyRegistrations
+      summary: List my registrations
+      description: '**Who can use this:** Volunteer'
+      responses:
+        '200':
+          description: My registrations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+      parameters:
+      - name: page
+        in: query
+        required: false
+        description: Page number (default 1)
+        schema:
+          type: integer
+          example: 1
+      - name: limit
+        in: query
+        required: false
+        description: Items per page (default 20)
+        schema:
+          type: integer
+          example: 20
+      - name: status
+        in: query
+        required: false
+        description: Filter by status
+        schema:
+          type: string
+          enum:
+          - registered
+          - attended
+          - absent
+          - cancelled
+  /api/registrations/{id}:
+    patch:
+      tags:
+      - Registrations
+      operationId: markAttendance
+      summary: Mark attendance
+      description: '**Who can use this:** Organizer (owner of the event)'
+      responses:
+        '200':
+          description: Attendance updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Registration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Registration ID
+        schema:
+          type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttendanceUpdate'
+            example:
+              status: attended
+    delete:
+      tags:
+      - Registrations
+      operationId: cancelRegistration
+      summary: Cancel my registration
+      description: 'Sets the status to `cancelled` (keeps history) and frees up the slot.
+
+
+        **Who can use this:** Volunteer (owner)'
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Registration cancelled
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Registration ID
+        schema:
+          type: integer
+          example: 1
+  /api/geocode:
+    get:
+      tags:
+      - Geocode
+      operationId: geocodeAddress
+      summary: Turn an address into map coordinates
+      description: 'Used when creating an event to place the meetup pin. Our backend handles the lookup and caches results.
+
+
+        **Who can use this:** Organizer'
+      responses:
+        '200':
+          description: Matching places
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GeocodeResult'
+              example:
+              - display_name: Macabalan, Cagayan de Oro, Misamis Oriental
+                lat: 8.4965
+                lng: 124.6477
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+      parameters:
+      - name: q
+        in: query
+        required: true
+        description: Address to search
+        schema:
+          type: string
+          example: Macabalan, Cagayan de Oro
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Not found
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Deleted successfully
+    PageMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 20
+        total:
+          type: integer
+          example: 42
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Juan Dela Cruz
+        email:
+          type: string
+          format: email
+          example: juan@my.xu.edu.ph
+        phone:
+          type: string
+          example: 09171234567
+        role:
+          type: string
+          enum:
+          - volunteer
+          - organizer
+          - admin
+          example: volunteer
+        is_active:
+          type: boolean
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-11-03T08:00:00Z'
+    RegisterRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Juan Dela Cruz
+        email:
+          type: string
+          format: email
+          example: juan@my.xu.edu.ph
+        password:
+          type: string
+          minLength: 8
+          example: secret123
+      required:
+      - name
+      - email
+      - password
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: juan@my.xu.edu.ph
+        password:
+          type: string
+          example: secret123
+      required:
+      - email
+      - password
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: 'JWT. Send as `Authorization: Bearer <token>`'
+          example: eyJhbGciOiJIUzI1NiIs...
+        user:
+          $ref: '#/components/schemas/User'
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Juan D. Cruz
+        phone:
+          type: string
+          example: 09171234567
+    UserStatusUpdate:
+      type: object
+      properties:
+        is_active:
+          type: boolean
+          example: false
+      required:
+      - is_active
+    OrganizerApplicationCreate:
+      type: object
+      properties:
+        org_name:
+          type: string
+          example: CDO Coastal Cleanup Network
+        org_type:
+          type: string
+          enum:
+          - ngo
+          - lgu
+          - barangay
+          - school_org
+          - other
+          example: ngo
+        description:
+          type: string
+          example: We organize monthly coastal cleanups.
+        contact_email:
+          type: string
+          format: email
+          example: hello@cdocleanup.org
+        contact_phone:
+          type: string
+          example: 09171234567
+        proof_url:
+          type: string
+          format: uri
+          description: Link to proof of legitimacy (SEC/DSWD registration, barangay letter, etc.)
+          example: https://drive.google.com/file/d/example
+      required:
+      - org_name
+      - org_type
+      - description
+      - contact_email
+      - proof_url
+    OrganizerApplication:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5
+        user_id:
+          type: integer
+          example: 1
+        org_name:
+          type: string
+          example: CDO Coastal Cleanup Network
+        org_type:
+          type: string
+          enum:
+          - ngo
+          - lgu
+          - barangay
+          - school_org
+          - other
+          example: ngo
+        description:
+          type: string
+        contact_email:
+          type: string
+          format: email
+        contact_phone:
+          type: string
+        proof_url:
+          type: string
+          format: uri
+        status:
+          type: string
+          enum:
+          - pending
+          - approved
+          - rejected
+          example: pending
+        review_note:
+          type: string
+          nullable: true
+        reviewed_by:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-11-03T08:00:00Z'
+        reviewed_at:
+          type: string
+          format: date-time
+          example: '2026-11-03T08:00:00Z'
+          nullable: true
+    OrganizerApplicationReview:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - approved
+          - rejected
+          example: approved
+        review_note:
+          type: string
+          description: Required when rejecting
+          example: SEC registration verified.
+      required:
+      - status
+    OrganizationInput:
+      type: object
+      properties:
+        name:
+          type: string
+          example: CDO Coastal Cleanup Network
+        description:
+          type: string
+          example: Monthly coastal cleanups around CDO.
+        contact_email:
+          type: string
+          format: email
+          example: hello@cdocleanup.org
+        contact_phone:
+          type: string
+          example: 09171234567
+      required:
+      - name
+      - contact_email
+    Organization:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 3
+        organizer_id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: CDO Coastal Cleanup Network
+        org_type:
+          type: string
+          enum:
+          - ngo
+          - lgu
+          - barangay
+          - school_org
+          - other
+          example: ngo
+        description:
+          type: string
+        contact_email:
+          type: string
+          format: email
+        contact_phone:
+          type: string
+        is_verified:
+          type: boolean
+          example: true
+        event_count:
+          type: integer
+          example: 8
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-11-03T08:00:00Z'
+    EventInput:
+      type: object
+      properties:
+        title:
+          type: string
+          example: Macabalan Coastal Cleanup
+        description:
+          type: string
+          example: Bring gloves and water.
+        category:
+          type: string
+          enum:
+          - cleanup
+          - tree_planting
+          - feeding_program
+          - relief_operations
+          - education
+          - other
+          example: cleanup
+        starts_at:
+          type: string
+          format: date-time
+          example: '2026-11-21T06:00:00+08:00'
+        ends_at:
+          type: string
+          format: date-time
+          example: '2026-11-21T10:00:00+08:00'
+        slots:
+          type: integer
+          minimum: 1
+          example: 40
+        address:
+          type: string
+          example: Macabalan, Cagayan de Oro
+        lat:
+          type: number
+          example: 8.4965
+        lng:
+          type: number
+          example: 124.6477
+        safety_notes:
+          type: string
+          example: Wear closed shoes.
+        status:
+          type: string
+          enum:
+          - upcoming
+          - cancelled
+          - completed
+          example: upcoming
+      required:
+      - title
+      - category
+      - starts_at
+      - slots
+      - address
+      - lat
+      - lng
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 12
+        organization_id:
+          type: integer
+          example: 3
+        organization_name:
+          type: string
+          example: CDO Coastal Cleanup Network
+        organization_verified:
+          type: boolean
+          example: true
+        title:
+          type: string
+          example: Macabalan Coastal Cleanup
+        description:
+          type: string
+        category:
+          type: string
+          enum:
+          - cleanup
+          - tree_planting
+          - feeding_program
+          - relief_operations
+          - education
+          - other
+          example: cleanup
+        starts_at:
+          type: string
+          format: date-time
+          example: '2026-11-03T08:00:00Z'
+        ends_at:
+          type: string
+          format: date-time
+          example: '2026-11-03T08:00:00Z'
+        slots:
+          type: integer
+          example: 40
+        registered_count:
+          type: integer
+          example: 25
+        available_slots:
+          type: integer
+          example: 15
+        address:
+          type: string
+          example: Macabalan, Cagayan de Oro
+        lat:
+          type: number
+          example: 8.4965
+        lng:
+          type: number
+          example: 124.6477
+        safety_notes:
+          type: string
+        status:
+          type: string
+          enum:
+          - upcoming
+          - cancelled
+          - completed
+          example: upcoming
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-11-03T08:00:00Z'
+    RegistrationCreate:
+      type: object
+      properties:
+        note:
+          type: string
+          description: Optional message to the organizer
+          example: I'll bring extra gloves.
+    Registration:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 30
+        event_id:
+          type: integer
+          example: 12
+        event_title:
+          type: string
+          example: Macabalan Coastal Cleanup
+        user_id:
+          type: integer
+          example: 1
+        user_name:
+          type: string
+          example: Juan Dela Cruz
+        note:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum:
+          - registered
+          - attended
+          - absent
+          - cancelled
+          example: registered
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-11-03T08:00:00Z'
+    AttendanceUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - attended
+          - absent
+          example: attended
+      required:
+      - status
+    GeocodeResult:
+      type: object
+      properties:
+        display_name:
+          type: string
+          example: Macabalan, Cagayan de Oro, Misamis Oriental
+        lat:
+          type: number
+          example: 8.4965
+        lng:
+          type: number
+          example: 124.6477
+    UserList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+    OrganizerApplicationList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizerApplication'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+    OrganizationList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Organization'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+    EventList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+    RegistrationList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Registration'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+  responses:
+    BadRequest:
+      description: Invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: title is required
+    Unauthorized:
+      description: Not logged in or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Invalid or missing token
+    Forbidden:
+      description: Your role is not allowed to do this
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Only organizers can create events
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Event not found
+    Conflict:
+      description: Duplicate or conflicting request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Email is already registered
+security:
+- bearerAuth: []
