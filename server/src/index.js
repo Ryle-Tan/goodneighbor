@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 
 const healthRoutes = require('./routes/health');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/health', healthRoutes);
+app.use('/api/auth', authRoutes);
 
 // 404 for any route that doesn't exist
 app.use((req, res) => {
