@@ -1,0 +1,261 @@
+.auth {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+}
+
+/* ---------- Animations ---------- */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+/* ---------- Left green panel ---------- */
+.auth-side {
+  background: var(--teal);
+  color: var(--white);
+  padding: 48px 56px;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-logo {
+  display: inline-block;
+  width: fit-content;
+  transition: transform 0.2s ease;
+}
+
+.auth-logo:hover {
+  transform: scale(1.15) rotate(-6deg);
+}
+
+.auth-welcome {
+  margin: auto 0; /* centers the text vertically */
+  animation: fade-up 0.6s ease both;
+}
+
+.auth-side h1 {
+  font-size: 2rem;
+  line-height: 1.2;
+  max-width: 340px;
+  margin: 0 0 16px;
+}
+
+.auth-side p {
+  max-width: 380px;
+  line-height: 1.6;
+  margin: 0;
+  opacity: 0.9;
+}
+
+/* ---------- Right form ---------- */
+.auth-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+}
+
+.auth-form {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  animation: fade-up 0.5s ease 0.1s both;
+}
+
+.auth-signup-fields {
+  display: flex;
+  flex-direction: column;
+  animation: fade-up 0.35s ease both;
+}
+
+/* Tabs with a sliding green pill */
+.auth-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.auth-tabs::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  background: var(--teal);
+  border-radius: var(--radius-pill);
+  transition: transform 0.3s ease;
+}
+
+.auth-tabs.is-signup::before {
+  transform: translateX(100%);
+}
+
+.auth-tabs a {
+  position: relative; /* sits above the pill */
+  text-align: center;
+  padding: 10px;
+  border-radius: var(--radius-pill);
+  color: var(--gray);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.auth-tabs a:not(.active):hover {
+  color: var(--teal);
+}
+
+.auth-tabs a.active {
+  color: var(--white);
+}
+
+.auth-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin: 16px 0 8px;
+}
+
+/* Volunteer / Organization cards */
+.auth-roles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.auth-roles button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: var(--white);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--gray);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.auth-roles button:hover {
+  transform: translateY(-2px);
+  border-color: var(--teal);
+  box-shadow: 0 6px 16px rgba(31, 138, 120, 0.15);
+}
+
+.auth-roles button.active {
+  background: var(--teal-light);
+  border-color: var(--teal);
+  color: var(--teal-dark);
+}
+
+.auth-hint {
+  font-size: 0.8rem;
+  color: var(--gray);
+  line-height: 1.5;
+  margin: 10px 0 0;
+  animation: fade-up 0.3s ease both;
+}
+
+/* Inputs */
+.auth-form input {
+  padding: 14px 16px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-form input:hover {
+  border-color: #b8e2d6;
+}
+
+.auth-form input:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 4px rgba(31, 138, 120, 0.15);
+}
+
+.auth-error {
+  color: var(--red);
+  font-size: 0.9rem;
+  margin: 16px 0 0;
+  animation: shake 0.4s ease;
+}
+
+/* Main button */
+.auth-submit {
+  margin-top: 24px;
+  padding: 15px;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--coral);
+  color: var(--white);
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auth-submit:hover:not(:disabled) {
+  background: var(--coral-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255, 122, 89, 0.35);
+}
+
+.auth-submit:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+}
+
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.auth-terms {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--gray);
+  margin-top: 20px;
+}
+
+/* ---------- Phones / small screens ---------- */
+@media (max-width: 800px) {
+  .auth {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-side {
+    display: none;
+  }
+}
+
+/* Turn off animations for people who set "reduce motion" on their device */
+@media (prefers-reduced-motion: reduce) {
+  .auth *,
+  .auth *::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}

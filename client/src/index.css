@@ -1,4 +1,24 @@
-/* Global styles. TAMPUS will add the design tokens (colors, fonts) here. */
+/* Design tokens: use these everywhere, e.g. color: var(--teal); */
+:root {
+  --teal: #1f8a78;
+  --teal-dark: #17705f;
+  --teal-light: #dff2ec;
+  --coral: #ff7a59;
+  --coral-dark: #f0623f;
+  --cream: #fff6ec;
+  --white: #ffffff;
+  --ink: #2a2833;
+  --gray: #6b6875;
+  --border: #d9efe8;
+  --red: #c8432f;
+
+  --font-heading: 'Fredoka', sans-serif;
+  --font-body: 'Nunito', sans-serif;
+
+  --radius: 14px;
+  --radius-pill: 999px;
+}
+
 *,
 *::before,
 *::after {
@@ -7,5 +27,20 @@
 
 body {
   margin: 0;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--cream);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-heading);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
 }

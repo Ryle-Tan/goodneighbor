@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import Placeholder from './components/Placeholder'
+import AuthPage from './pages/auth/AuthPage'
 
 // Each person adds or replaces routes ONLY inside their own section.
 // Swap <Placeholder ... /> for your real page when it's ready.
@@ -15,8 +16,8 @@ export default function App() {
       <Route path="/organizations/:id" element={<Placeholder name="Organization" owner="TAMPUS" />} />
 
       {/* --- TAN: auth --- */}
-      <Route path="/login" element={<Placeholder name="Log in" owner="TAN" />} />
-      <Route path="/signup" element={<Placeholder name="Sign up" owner="TAN" />} />
+      <Route path="/login" element={<AuthPage mode="login" />} />
+      <Route path="/signup" element={<AuthPage mode="signup" />} />
 
       {/* Logged-in users only */}
       <Route element={<ProtectedRoute />}>
