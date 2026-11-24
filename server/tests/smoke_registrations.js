@@ -5,12 +5,17 @@
  *   1. API running (npm run dev / node src/index.js)
  *   2. Seed data: node db/seed_lim_test.js
  *
- * Run:  node db/smoke_registrations.js
+ * Run (from server/):  node tests/smoke_registrations.js
+ *
+ * Event IDs are looked up by title from the DB, so re-seeding (ids 7/8/9…) still works.
  */
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 const { pool } = require('../src/db');
 
 const base = `http://localhost:${process.env.PORT || 3000}/api`;
+
+const UPCOMING_TITLE = 'Cagayan de Oro River Cleanup';
+const STARTED_TITLE = 'Past Coastal Cleanup (for attendance)';
 
 const results = [];
 
@@ -33,16 +38,6 @@ async function req(method, path, { token, body } = {}) {
   return { status: res.status, json };
 }
 
-/**
- * Print one check in layman terms and record pass/fail.
- * @param {object} opts
- * @param {string} opts.title - short name
- * @param {string} opts.what - what this step is doing
- * @param {string} opts.expected - what should happen
- * @param {{ status: number, json: any }} opts.result - API response
- * @param {(result) => boolean} opts.passIf - return true if the response is correct
- * @param {(result) => string} [opts.got] - optional plain summary of what we got
- */
 function check({ title, what, expected, result, passIf, got }) {
   const ok = Boolean(passIf(result));
   results.push({ title, ok });
@@ -64,10 +59,33 @@ function check({ title, what, expected, result, passIf, got }) {
   }
 }
 
+async function findEventIdByTitle(title) {
+  const { rows } = await pool.query(
+    `SELECT id FROM events WHERE title = $1 ORDER BY id DESC LIMIT 1`,
+    [title]
+  );
+  return rows[0]?.id ?? null;
+}
+
 async function main() {
   console.log('GoodNeighbor — registrations smoke test');
   console.log(`API: ${base}`);
   console.log('Each step below should say PASS if the backend rules are working.\n');
+
+  const upcomingEventId = await findEventIdByTitle(UPCOMING_TITLE);
+  const startedEventId = await findEventIdByTitle(STARTED_TITLE);
+
+  if (!upcomingEventId || !startedEventId) {
+    console.log('Could not find seeded events in the database.');
+    console.log(`  Looking for: "${UPCOMING_TITLE}" → ${upcomingEventId ?? 'MISSING'}`);
+    console.log(`  Looking for: "${STARTED_TITLE}" → ${startedEventId ?? 'MISSING'}`);
+    console.log('Run: node db/seed_lim_test.js');
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`Using upcoming event id=${upcomingEventId} ("${UPCOMING_TITLE}")`);
+  console.log(`Using started event  id=${startedEventId} ("${STARTED_TITLE}")`);
 
   // --- Logins (setup) ---
   const vLogin = await req('POST', '/auth/login', {
@@ -117,13 +135,13 @@ async function main() {
   await pool.query('DELETE FROM registrations WHERE user_id = $1', [volunteerId]);
 
   // --- Join ---
-  const join = await req('POST', '/events/1/registrations', {
+  const join = await req('POST', `/events/${upcomingEventId}/registrations`, {
     token: vToken,
     body: { note: 'I can bring extra gloves!' },
   });
   check({
     title: '3. Volunteer joins an upcoming activity',
-    what: 'Volunteer signs up for event #1 (River Cleanup) with a note',
+    what: `Volunteer signs up for event #${upcomingEventId} (River Cleanup) with a note`,
     expected: 'HTTP 201 and status "registered"',
     result: join,
     passIf: (r) => r.status === 201 && r.json?.status === 'registered' && r.json?.id,
@@ -133,17 +151,20 @@ async function main() {
         : r.json?.error || 'Join failed',
   });
 
-  const dup = await req('POST', '/events/1/registrations', { token: vToken, body: {} });
+  const dup = await req('POST', `/events/${upcomingEventId}/registrations`, {
+    token: vToken,
+    body: {},
+  });
   check({
     title: '4. Cannot join the same activity twice',
-    what: 'Volunteer tries to join event #1 again',
+    what: `Volunteer tries to join event #${upcomingEventId} again`,
     expected: 'HTTP 409 — already registered',
     result: dup,
     passIf: (r) => r.status === 409,
     got: (r) => r.json?.error || '(no error message)',
   });
 
-  const orgForbidden = await req('POST', '/events/1/registrations', {
+  const orgForbidden = await req('POST', `/events/${upcomingEventId}/registrations`, {
     token: oToken,
     body: {},
   });
@@ -170,10 +191,12 @@ async function main() {
         : r.json?.error || 'Unexpected response',
   });
 
-  const listOrg = await req('GET', '/events/1/registrations', { token: oToken });
+  const listOrg = await req('GET', `/events/${upcomingEventId}/registrations`, {
+    token: oToken,
+  });
   check({
     title: '7. Organizer can see who joined their event',
-    what: 'Organizer lists registrations for event #1',
+    what: `Organizer lists registrations for event #${upcomingEventId}`,
     expected: 'HTTP 200 with the volunteer in the list',
     result: listOrg,
     passIf: (r) => r.status === 200 && r.json.meta?.total >= 1,
@@ -183,10 +206,12 @@ async function main() {
         : r.json?.error || 'Unexpected response',
   });
 
-  const listVol = await req('GET', '/events/1/registrations', { token: vToken });
+  const listVol = await req('GET', `/events/${upcomingEventId}/registrations`, {
+    token: vToken,
+  });
   check({
     title: '8. Volunteer cannot see the full registrant list',
-    what: 'Volunteer tries to list everyone on event #1',
+    what: `Volunteer tries to list everyone on event #${upcomingEventId}`,
     expected: 'HTTP 403 — only organizer/admin may do that',
     result: listVol,
     passIf: (r) => r.status === 403,
@@ -205,13 +230,13 @@ async function main() {
     got: (r) => r.json?.message || r.json?.error || '(no message)',
   });
 
-  const rejoin = await req('POST', '/events/1/registrations', {
+  const rejoin = await req('POST', `/events/${upcomingEventId}/registrations`, {
     token: vToken,
     body: { note: 'Back again' },
   });
   check({
     title: '10. Volunteer can join again after cancelling',
-    what: 'Volunteer re-registers for event #1',
+    what: `Volunteer re-registers for event #${upcomingEventId}`,
     expected: 'HTTP 201 with a NEW registration id (old cancelled row kept as history)',
     result: rejoin,
     passIf: (r) =>
@@ -238,9 +263,9 @@ async function main() {
 
   const ins = await pool.query(
     `INSERT INTO registrations (event_id, user_id, note)
-     VALUES (3, $1, 'seeded for attendance')
+     VALUES ($1, $2, 'seeded for attendance')
      RETURNING id`,
-    [volunteerId]
+    [startedEventId, volunteerId]
   );
   const pastRegId = ins.rows[0].id;
 
@@ -250,7 +275,7 @@ async function main() {
   });
   check({
     title: '12. Organizer can mark attended after the event starts',
-    what: `Organizer sets registration #${pastRegId} (started event #3) to attended`,
+    what: `Organizer sets registration #${pastRegId} (started event #${startedEventId}) to attended`,
     expected: 'HTTP 200 and status "attended"',
     result: att,
     passIf: (r) => r.status === 200 && r.json?.status === 'attended',
@@ -288,10 +313,13 @@ async function main() {
     got: (r) => r.json?.error || '(no error message)',
   });
 
-  const closed = await req('POST', '/events/3/registrations', { token: vToken, body: {} });
+  const closed = await req('POST', `/events/${startedEventId}/registrations`, {
+    token: vToken,
+    body: {},
+  });
   check({
     title: '15. Cannot join an event that already started',
-    what: 'Volunteer tries to join event #3 (already started)',
+    what: `Volunteer tries to join event #${startedEventId} (already started)`,
     expected: 'HTTP 409 — event is not open for registration',
     result: closed,
     passIf: (r) => r.status === 409,
