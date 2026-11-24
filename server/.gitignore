@@ -1,2 +1,6 @@
 .env
+.env.*
+!.env.example
 node_modules
+
+db/seed_lim_test.sql
